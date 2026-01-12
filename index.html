@@ -1,128 +1,161 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Vision AI</title>
+<meta charset="UTF-8">
+<title>AI Vision</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 
-  <style>
-    body {
-      margin: 0;
-      background: white;
-      font-family: Arial, sans-serif;
-    }
+<style>
+:root {
+  --glass: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.18);
+  --accent: #4f46e5;
+}
 
-    /* TOP BAR */
-    #topbar {
-      width: 100%;
-      height: 50px;
-      background: #f2f2f2;
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      padding-right: 10px;
-      box-sizing: border-box;
-    }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", Inter, sans-serif;
+}
 
-    #flipBtn {
-      padding: 8px 14px;
-      font-size: 14px;
-      font-weight: bold;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 6px;
-    }
+body {
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color: white;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
 
-    #camera {
-      display: flex;
-      justify-content: center;
-      margin-top: 10px;
-    }
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  opacity: 0.9;
+  margin-bottom: 14px;
+}
 
-    canvas {
-      width: 90vw;
-      max-width: 400px;
-      border: 2px solid #007bff;
-      border-radius: 10px;
-    }
+.glass {
+  width: 100%;
+  max-width: 420px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 10px;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+}
 
-    #label {
-      text-align: center;
-      margin-top: 10px;
-      font-size: 18px;
-      font-weight: bold;
-      color: black;
-    }
-  </style>
+canvas {
+  width: 100%;
+  border-radius: 16px;
+}
+
+.prediction {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ring {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background:
+    conic-gradient(var(--accent) 0deg, rgba(255,255,255,0.1) 0deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s ease;
+}
+
+.inner {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px;
+}
+
+.footer {
+  margin-top: auto;
+  font-size: 11px;
+  opacity: 0.35;
+  padding-top: 12px;
+}
+</style>
 </head>
 
 <body>
 
-  <!-- TOP BAR WITH BUTTON -->
-  <div id="topbar">
-    <button id="flipBtn" onclick="flipCamera()">Flip Camera</button>
-  </div>
+<div class="title">AI Vision</div>
 
+<div class="glass">
   <div id="camera"></div>
-  <div id="label">Loading model…</div>
+</div>
 
-  <script>
-    const modelURL = "https://teachablemachine.withgoogle.com/models/S9q_dztT1/";
-    let model, webcam;
-    let isFrontCamera = true;
+<div class="prediction">
+  <div class="ring" id="ring">
+    <div class="inner" id="label">Loading</div>
+  </div>
+</div>
 
-    async function init() {
-      model = await tmImage.load(
-        modelURL + "model.json",
-        modelURL + "metadata.json"
-      );
-      startCamera();
-    }
+<div class="footer">Powered by Teachable Machine</div>
 
-    async function startCamera() {
-      if (webcam) {
-        webcam.stop();
-        document.getElementById("camera").innerHTML = "";
-      }
+<script>
+const modelURL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_URL_HERE/";
 
-      webcam = new tmImage.Webcam(400, 300, isFrontCamera);
-      await webcam.setup();
-      await webcam.play();
+let model, webcam;
+let lastClass = "";
 
-      document.getElementById("camera").appendChild(webcam.canvas);
-      window.requestAnimationFrame(loop);
-    }
+async function init() {
+  model = await tmImage.load(
+    modelURL + "model.json",
+    modelURL + "metadata.json"
+  );
 
-    function flipCamera() {
-      isFrontCamera = !isFrontCamera;
-      startCamera();
-    }
+  webcam = new tmImage.Webcam(400, 300, false); // BACK CAMERA ONLY
+  await webcam.setup();
+  await webcam.play();
 
-    async function loop() {
-      webcam.update();
-      await predict();
-      requestAnimationFrame(loop);
-    }
+  document.getElementById("camera").appendChild(webcam.canvas);
+  requestAnimationFrame(loop);
+}
 
-    async function predict() {
-      const predictions = await model.predict(webcam.canvas);
-      const best = predictions.reduce((a, b) =>
-        a.probability > b.probability ? a : b
-      );
+async function loop() {
+  webcam.update();
+  await predict();
+  setTimeout(() => requestAnimationFrame(loop), 700);
+}
 
-      document.getElementById("label").innerText =
-        best.className + " (" + (best.probability * 100).toFixed(1) + "%)";
+async function predict() {
+  const predictions = await model.predict(webcam.canvas);
+  const best = predictions.reduce((a,b)=>a.probability>b.probability?a:b);
 
-      if (window.AppInventor) {
-        window.AppInventor.setWebViewString(best.className);
-      }
-    }
+  const percent = Math.round(best.probability * 100);
 
-    init();
-  </script>
+  document.getElementById("label").innerText = best.className;
+  document.getElementById("ring").style.background =
+    `conic-gradient(#4f46e5 ${percent*3.6}deg, rgba(255,255,255,0.12) 0deg)`;
+
+  if (window.AppInventor && best.className !== lastClass) {
+    window.AppInventor.setWebViewString(best.className);
+    lastClass = best.className;
+  }
+}
+
+init();
+</script>
 
 </body>
 </html>
